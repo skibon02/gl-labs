@@ -22,45 +22,24 @@ pub mod gl {
 }
 
 pub fn main(event_loop: winit::event_loop::EventLoop<()>) {
-    // Only windows requires the window to be present before creating the display.
-    // Other platforms don't really need one.
-    //
-    // XXX if you don't care about running on android or so you can safely remove
-    // this condition and always pass the window builder.
-    let window_builder =
-        if cfg!(wgl_backend) { Some(WindowBuilder::new().with_inner_size(LogicalSize::new(800, 600)).with_transparent(true)) } else { None };
+    let window_builder = Some(WindowBuilder::new().with_inner_size(LogicalSize::new(800, 600)).with_transparent(true));
 
-    // The template will match only the configurations supporting rendering
-    // to windows.
-    //
-    // XXX We force transparency only on macOS, given that EGL on X11 doesn't
-    // have it, but we still want to show window. The macOS situation is like
-    // that, because we can query only one config at a time on it, but all
-    // normal platforms will return multiple configs, so we can find the config
-    // with transparency ourselves inside the `reduce`.
-    let template =
-        ConfigTemplateBuilder::new().with_alpha_size(8).with_transparency(cfg!(cgl_backend));
+    let template = ConfigTemplateBuilder::new().with_alpha_size(8);
 
     let display_builder = DisplayBuilder::new().with_window_builder(window_builder);
 
-    let (mut window, gl_config) = display_builder
-        .build(&event_loop, template, |configs| {
-            // Find the config with the maximum number of samples, so our triangle will
-            // be smooth.
-            configs
-                .reduce(|accum, config| {
-                    let transparency_check = config.supports_transparency().unwrap_or(false)
-                        & !accum.supports_transparency().unwrap_or(false);
+    let (mut window, gl_config) = display_builder.build(&event_loop, template, |configs| {
+            configs.reduce(|accum, config| {
+                let transparency_check = config.supports_transparency().unwrap_or(false)
+                    & !accum.supports_transparency().unwrap_or(false);
 
-                    if transparency_check || config.num_samples() > accum.num_samples() {
-                        config
-                    } else {
-                        accum
-                    }
-                })
-                .unwrap()
-        })
-        .unwrap();
+                if transparency_check || config.num_samples() > accum.num_samples() {
+                    config
+                } else {
+                    accum
+                }
+            }).unwrap()
+        }).unwrap();
 
     println!("Picked a config with {} samples", gl_config.num_samples());
 
@@ -84,7 +63,10 @@ pub fn main(event_loop: winit::event_loop::EventLoop<()>) {
     let mut state = None;
     let mut renderer = None;
     event_loop.run(move |event, window_target, control_flow| {
-        control_flow.set_wait();
+        control_flow.set_poll();
+
+        println!("{:?}", event);
+        
         match event {
             Event::Resumed => {
                 let window = window.take().unwrap_or_else(|| {
@@ -115,18 +97,6 @@ pub fn main(event_loop: winit::event_loop::EventLoop<()>) {
                 }
 
                 assert!(state.replace((gl_context, gl_surface, window)).is_none());
-            },
-            Event::Suspended => {
-                // This event is only raised on Android, where the backing NativeWindow for a GL
-                // Surface can appear and disappear at any moment.
-                println!("Android window removed");
-
-                // Destroy the GL Surface and un-current the GL Context before ndk-glue releases
-                // the window back to the system.
-                let (gl_context, ..) = state.take().unwrap();
-                assert!(not_current_gl_context
-                    .replace(gl_context.make_not_current().unwrap())
-                    .is_none());
             },
             Event::WindowEvent { event, .. } => match event {
                 WindowEvent::Resized(size) => {

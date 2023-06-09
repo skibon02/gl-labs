@@ -65,7 +65,7 @@ pub fn main(event_loop: winit::event_loop::EventLoop<()>) {
     event_loop.run(move |event, window_target, control_flow| {
         control_flow.set_poll();
 
-        println!("{:?}", event);
+        // println!("{:?}", event);
         
         match event {
             Event::Resumed => {
@@ -172,21 +172,7 @@ impl Renderer {
             let fragment_shader = create_shader(&gl, gl::FRAGMENT_SHADER, FRAGMENT_SHADER_SOURCE);
 
             //check errors
-            let mut success = gl::FALSE as gl::types::GLint;
-            let mut info_log = Vec::with_capacity(512);
-            gl.GetShaderiv(fragment_shader, gl::COMPILE_STATUS, &mut success);
-            if success != gl::TRUE as gl::types::GLint {
-                gl.GetShaderInfoLog(
-                    fragment_shader,
-                    512,
-                    std::ptr::null_mut(),
-                    info_log.as_mut_ptr() as *mut _,
-                );
-                println!(
-                    "ERROR::SHADER::FRAGMENT::COMPILATION_FAILED\n{}",
-                    std::str::from_utf8(&info_log).unwrap()
-                );
-            }
+            Renderer::check_shader_errors(&gl, [vertex_shader, fragment_shader]);
 
             let program = gl.CreateProgram();
 
@@ -256,6 +242,28 @@ impl Renderer {
             self.gl.Viewport(0, 0, width, height);
             self.gl
                 .Uniform2f(self.resolution_location, width as f32, height as f32);
+        }
+    }
+    pub fn check_shader_errors( gl: &gl::Gl, [vertex_shader, fragment_shader]: [gl::types::GLuint; 2]) {
+        let mut success = gl::FALSE as gl::types::GLint;
+
+
+        unsafe { gl.GetShaderiv(vertex_shader, gl::COMPILE_STATUS, &mut success) };
+        if success != gl::TRUE as gl::types::GLint {
+            let mut info_log = [0u8; 512];
+            let mut len = 0;
+            unsafe { gl.GetShaderInfoLog(vertex_shader, 512, &mut len, info_log.as_mut_ptr() as *mut _) };
+            let info_log = std::str::from_utf8(&info_log[..len as usize]).unwrap();
+            println!("Vertex shader compilation failed: {}", info_log);
+        }
+
+        unsafe { gl.GetShaderiv(fragment_shader, gl::COMPILE_STATUS, &mut success) };
+        if success != gl::TRUE as gl::types::GLint {
+            let mut info_log = [0u8; 512];
+            let mut len = 0;
+            unsafe { gl.GetShaderInfoLog(fragment_shader, 512, &mut len, info_log.as_mut_ptr() as *mut _) };
+            let info_log = std::str::from_utf8(&info_log[..len as usize]).unwrap();
+            println!("Fragment shader compilation failed: {}", info_log);
         }
     }
 }

@@ -65,7 +65,9 @@ pub fn main(event_loop: winit::event_loop::EventLoop<()>) {
     event_loop.run(move |event, window_target, control_flow| {
         control_flow.set_poll();
 
-        // println!("{:?}", event);
+        if let Event::WindowEvent{ .. } = event {
+            println!("{:?}", event);
+        }
         
         match event {
             Event::Resumed => {

@@ -1,6 +1,7 @@
 use std::ffi::{CStr, CString};
 use std::num::NonZeroU32;
 use std::ops::Deref;
+use std::time::Instant;
 
 use winit::dpi::LogicalSize;
 use winit::event::{Event, WindowEvent};
@@ -62,12 +63,17 @@ pub fn main(event_loop: winit::event_loop::EventLoop<()>) {
 
     let mut state = None;
     let mut renderer = None;
+
+    let mut frame_count = 0;
+    let mut prev_second = 0;
+    let start = Instant::now();
     event_loop.run(move |event, window_target, control_flow| {
         control_flow.set_poll();
 
-        if let Event::WindowEvent{ .. } = event {
-            println!("{:?}", event);
-        }
+
+        // if let Event::WindowEvent{ .. } = event {
+        //     println!("{:?}", event);
+        // }
         
         match event {
             Event::Resumed => {
@@ -93,7 +99,7 @@ pub fn main(event_loop: winit::event_loop::EventLoop<()>) {
 
                 // Try setting vsync.
                 if let Err(res) = gl_surface
-                    .set_swap_interval(&gl_context, SwapInterval::Wait(NonZeroU32::new(1).unwrap()))
+                    .set_swap_interval(&gl_context, SwapInterval::DontWait)
                 {
                     eprintln!("Error setting vsync: {res:?}");
                 }
@@ -125,6 +131,16 @@ pub fn main(event_loop: winit::event_loop::EventLoop<()>) {
             },
             Event::RedrawEventsCleared => {
                 if let Some((gl_context, gl_surface, window)) = &state {
+                    let now = Instant::now();
+                    let cur_int_sec = (now - start).as_secs();
+                    if cur_int_sec != prev_second {
+                        println!("FPS: {}", frame_count);
+                        
+                        frame_count = 0;
+                        prev_second = cur_int_sec;
+                    }
+                    frame_count += 1;
+                    
                     let renderer = renderer.as_ref().unwrap();
                     renderer.draw();
                     window.request_redraw();
